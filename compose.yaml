@@ -1,0 +1,95 @@
+services:
+  db:
+    image: docker.io/library/postgres:15-alpine
+    environment:
+      POSTGRES_USER: study_bot
+      POSTGRES_DB: study_bot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in local .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U study_bot -d study_bot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    image: localhost/study-chat-bot:local
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      STUDY_TIMEZONE: ${STUDY_TIMEZONE:-UTC}
+      DATABASE_URL: postgresql+asyncpg://study_bot:${POSTGRES_PASSWORD}@db:5432/study_bot
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    image: localhost/study-chat-bot:local
+    command: ["python", "-m", "app.cli", "schedule-watch"]
+    environment:
+      STUDY_TIMEZONE: ${STUDY_TIMEZONE:-UTC}
+      DATABASE_URL: postgresql+asyncpg://study_bot:${POSTGRES_PASSWORD}@db:5432/study_bot
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      BOT_CHANNEL_ID: ${BOT_CHANNEL_ID:-}
+      SOURCE_CHAT_ID: ${SOURCE_CHAT_ID:-}
+      BOT_ALLOWED_CHAT_IDS: ${BOT_ALLOWED_CHAT_IDS:-}
+    volumes:
+      - media_data:/app/private/media:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  bot:
+    image: localhost/study-chat-bot:local
+    profiles: ["live"]
+    command: ["python", "-m", "app.bot"]
+    environment:
+      STUDY_TIMEZONE: ${STUDY_TIMEZONE:-UTC}
+      DATABASE_URL: postgresql+asyncpg://study_bot:${POSTGRES_PASSWORD}@db:5432/study_bot
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      BOT_OWNER_USER_ID: ${BOT_OWNER_USER_ID:-}
+      BOT_ALLOWED_CHAT_IDS: ${BOT_ALLOWED_CHAT_IDS:-}
+      BOT_CHANNEL_ID: ${BOT_CHANNEL_ID:-}
+      SOURCE_CHAT_ID: ${SOURCE_CHAT_ID:-}
+      MEDIA_ROOT: private/media
+    volumes:
+      - media_data:/app/private/media:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  collector:
+    image: localhost/study-chat-bot:local
+    profiles: ["live"]
+    command: ["python", "-m", "app.telegram_cli", "collect"]
+    environment:
+      STUDY_TIMEZONE: ${STUDY_TIMEZONE:-UTC}
+      DATABASE_URL: postgresql+asyncpg://study_bot:${POSTGRES_PASSWORD}@db:5432/study_bot
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_ACCOUNT_USER_ID: ${TELEGRAM_ACCOUNT_USER_ID:-}
+      SCHEDULE_PUBLISHER_USER_ID: ${SCHEDULE_PUBLISHER_USER_ID:-}
+      SOURCE_CHAT_ID: ${SOURCE_CHAT_ID:-}
+      TELEGRAM_SESSION_PATH: private/session/telegram.session
+      MEDIA_ROOT: private/media
+      MEDIA_MAX_DOWNLOAD_MB: ${MEDIA_MAX_DOWNLOAD_MB:-25}
+      RECONCILE_DAYS: ${RECONCILE_DAYS:-7}
+      EXPORT_FINGERPRINT_PATH: private/export/export_fingerprint.json
+      SCHEDULE_PUBLISHER_MESSAGE_IDS: ${SCHEDULE_PUBLISHER_MESSAGE_IDS:-}
+    volumes:
+      - telegram_session:/app/private/session
+      - media_data:/app/private/media
+      - ./private/export:/app/private/export:ro,Z
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  telegram_session:
+  media_data:

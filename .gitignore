@@ -1,0 +1,22 @@
+# Credentials, private exports, user media, sessions and database backups
+.env
+.env.*
+!.env.example
+private/
+*.session*
+ChatExport*/
+result.json
+examples/media/
+*.zip
+*.dump
+*.sql
+*.db
+*.sqlite*
+# Python runtime and generated validation artifacts
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/

@@ -1,0 +1,10 @@
+{
+  "description": "Synthetic metadata only; no real attachments.",
+  "attachments": [
+    {
+      "message_id": 5,
+      "name": "demo-questions.pdf",
+      "status": "unavailable"
+    }
+  ]
+}

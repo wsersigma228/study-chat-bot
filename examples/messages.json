@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "description": "Entirely fictional messages, IDs, dates, rooms and tasks; not derived from a real conversation.",
+  "messages": [
+    {
+      "id": 1,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_1",
+      "sent_at": "2030-04-05T12:01:00+00:00",
+      "text": "Schedule for tomorrow:\n1. Algebra - 101\n2. English - 102",
+      "reply_to_message_id": null,
+      "attachments": []
+    },
+    {
+      "id": 2,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_2",
+      "sent_at": "2030-04-05T12:02:00+00:00",
+      "text": "Algebra homework: complete exercises 1 and 2. Due by 07.04.2030.",
+      "reply_to_message_id": null,
+      "attachments": []
+    },
+    {
+      "id": 3,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_3",
+      "sent_at": "2030-04-05T12:03:00+00:00",
+      "text": "English homework: read workbook pages 3-4.",
+      "reply_to_message_id": null,
+      "attachments": []
+    },
+    {
+      "id": 4,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_1",
+      "sent_at": "2030-04-06T12:04:00+00:00",
+      "text": "Schedule for 07.04.2030:\n1. Programming - 103\n2. Physics - 104",
+      "reply_to_message_id": null,
+      "attachments": []
+    },
+    {
+      "id": 5,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_4",
+      "sent_at": "2030-04-06T12:05:00+00:00",
+      "text": "Physics homework: answer the questions in the attached file.",
+      "reply_to_message_id": null,
+      "attachments": []
+    },
+    {
+      "id": 6,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_2",
+      "sent_at": "2030-04-06T12:06:00+00:00",
+      "text": "Geometry homework: draw a triangle. No deadline specified.",
+      "reply_to_message_id": null,
+      "attachments": []
+    },
+    {
+      "id": 7,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_1",
+      "sent_at": "2030-04-07T12:07:00+00:00",
+      "text": "Schedule for 08.04.2030:\n1. Literature - 105\n2. Geometry - 106",
+      "reply_to_message_id": null,
+      "attachments": []
+    },
+    {
+      "id": 8,
+      "source_chat": "demo_group",
+      "author_alias": "demo_sender_5",
+      "sent_at": "2030-04-07T12:08:00+00:00",
+      "text": "Please share the schedule?",
+      "reply_to_message_id": null,
+      "attachments": []
+    }
+  ]
+}

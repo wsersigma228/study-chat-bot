@@ -1,0 +1,74 @@
+{
+  "id": 1,
+  "name": "Fictional Demo Group",
+  "type": "private_group",
+  "messages": [
+    {
+      "id": 1,
+      "type": "message",
+      "date_unixtime": "1901620860",
+      "from_id": "user101",
+      "from": "Demo Sender 1",
+      "text": "Schedule for tomorrow:\n1. Algebra - 101\n2. English - 102"
+    },
+    {
+      "id": 2,
+      "type": "message",
+      "date_unixtime": "1901620920",
+      "from_id": "user102",
+      "from": "Demo Sender 2",
+      "text": "Algebra homework: complete exercises 1 and 2. Due by 07.04.2030."
+    },
+    {
+      "id": 3,
+      "type": "message",
+      "date_unixtime": "1901620980",
+      "from_id": "user103",
+      "from": "Demo Sender 3",
+      "text": "English homework: read workbook pages 3-4."
+    },
+    {
+      "id": 4,
+      "type": "message",
+      "date_unixtime": "1901707440",
+      "from_id": "user101",
+      "from": "Demo Sender 1",
+      "text": "Schedule for 07.04.2030:\n1. Programming - 103\n2. Physics - 104"
+    },
+    {
+      "id": 5,
+      "type": "message",
+      "date_unixtime": "1901707500",
+      "from_id": "user104",
+      "from": "Demo Sender 4",
+      "text": "Physics homework: answer the questions in the attached file.",
+      "file": "(File unavailable, please try again later)",
+      "file_name": "demo-questions.pdf",
+      "file_size": 42
+    },
+    {
+      "id": 6,
+      "type": "message",
+      "date_unixtime": "1901707560",
+      "from_id": "user102",
+      "from": "Demo Sender 2",
+      "text": "Geometry homework: draw a triangle. No deadline specified."
+    },
+    {
+      "id": 7,
+      "type": "message",
+      "date_unixtime": "1901794020",
+      "from_id": "user101",
+      "from": "Demo Sender 1",
+      "text": "Schedule for 08.04.2030:\n1. Literature - 105\n2. Geometry - 106"
+    },
+    {
+      "id": 8,
+      "type": "message",
+      "date_unixtime": "1901794080",
+      "from_id": "user105",
+      "from": "Demo Sender 5",
+      "text": "Please share the schedule?"
+    }
+  ]
+}

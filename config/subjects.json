@@ -1,0 +1,104 @@
+{
+  "subjects": [
+    {
+      "key": "computer_design",
+      "name": "Computer Design",
+      "aliases": []
+    },
+    {
+      "key": "literature",
+      "name": "Literature",
+      "aliases": []
+    },
+    {
+      "key": "local_history",
+      "name": "Local History",
+      "aliases": []
+    },
+    {
+      "key": "iot",
+      "name": "Internet of Things",
+      "aliases": []
+    },
+    {
+      "key": "informatics",
+      "name": "Computer Science",
+      "aliases": []
+    },
+    {
+      "key": "english",
+      "name": "English",
+      "aliases": []
+    },
+    {
+      "key": "algebra",
+      "name": "Algebra",
+      "aliases": []
+    },
+    {
+      "key": "physics",
+      "name": "Physics",
+      "aliases": []
+    },
+    {
+      "key": "geometry",
+      "name": "Geometry",
+      "aliases": []
+    },
+    {
+      "key": "physical_education",
+      "name": "Physical Education",
+      "aliases": []
+    },
+    {
+      "key": "second_language",
+      "name": "Second Language",
+      "aliases": []
+    },
+    {
+      "key": "language",
+      "name": "Language",
+      "aliases": []
+    },
+    {
+      "key": "writing",
+      "name": "Writing",
+      "aliases": []
+    },
+    {
+      "key": "programming",
+      "name": "Programming",
+      "aliases": []
+    },
+    {
+      "key": "world_history",
+      "name": "World History",
+      "aliases": []
+    },
+    {
+      "key": "state_law",
+      "name": "Civics",
+      "aliases": []
+    },
+    {
+      "key": "astronomy",
+      "name": "Astronomy",
+      "aliases": []
+    },
+    {
+      "key": "safety",
+      "name": "Safety",
+      "aliases": []
+    },
+    {
+      "key": "finance_business",
+      "name": "Business and Finance",
+      "aliases": []
+    },
+    {
+      "key": "entrepreneurship",
+      "name": "Entrepreneurship",
+      "aliases": []
+    }
+  ]
+}

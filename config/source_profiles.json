@@ -1,0 +1,4 @@
+{
+  "profiles": [],
+  "policy": "No sender is trusted by default. Configure reviewed source profiles locally; explicit homework can be parsed without a sender profile."
+}

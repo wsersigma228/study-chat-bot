@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.git
+.venv
+private
+scripts
+*.md
+__pycache__
+.pytest_cache
+*.session*
+*.zip
+*.dump
+*.sql
+*.db
+*.sqlite*
+result.json

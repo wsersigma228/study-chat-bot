@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic scenarios only",
+  "cases": [
+    {
+      "message_id": 2,
+      "subject": "algebra",
+      "due_date": "2030-04-07"
+    },
+    {
+      "message_id": 3,
+      "subject": "english",
+      "due_date": null
+    },
+    {
+      "message_id": 5,
+      "attachment_status": "unavailable"
+    }
+  ]
+}

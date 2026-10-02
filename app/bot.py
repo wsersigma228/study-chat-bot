@@ -539,27 +539,36 @@ async def source_lines(session: AsyncSession, chat_id: int, peer_id: int | None,
     return lines or ["No sources found"]
 
 
+def units(value: str) -> int:
+    return len(value.encode("utf-16-le")) // 2
+
+
 def split_day(header: str, blocks: list[str], *, separator: str = "\n\n") -> list[str]:
-    """Split at lesson boundaries; repeat the lesson name when a single lesson is long."""
+    """Split at lesson boundaries; keep every part within Telegram's UTF-16 limit."""
+    continuation = header + ' (continued)'
+    if units(continuation) >= MESSAGE_LIMIT - 80:
+        raise ValueError("Message header is too long")
     parts, current = [], header
     for block in blocks:
-        if len(header) + len(block) + 2 > MESSAGE_LIMIT:
+        if units(continuation + separator + block) > MESSAGE_LIMIT:
             if current != header:
                 parts.append(current)
             title, newline, body = block.partition("\n")
-            if not newline:
-                title, body = "Entry", block
+            # Homework's first line can contain the entire untrusted task, not a short title.
+            if not newline or units(continuation + "\n" + title + ' — continued') >= MESSAGE_LIMIT - 80:
+                title, body = 'Entry', block
             prefix = f"{header}\n{title}"
             while body:
-                width = MESSAGE_LIMIT - len(prefix) - 1
-                parts.append(prefix + "\n" + body[:width])
-                body = body[width:]
-                prefix = f"{header} (continued)\n{title} — continued"
+                width = MESSAGE_LIMIT - units(prefix) - 1
+                piece = body.encode("utf-16-le")[:width * 2].decode("utf-16-le", errors="ignore")
+                parts.append(prefix + "\n" + piece)
+                body = body[len(piece):]
+                prefix = f"{continuation}\n{title}" + ' — continued'
             current = header
         else:
-            if len(current) + len(block) + 2 > MESSAGE_LIMIT:
+            if units(current + separator + block) > MESSAGE_LIMIT:
                 parts.append(current)
-                current = f"{header} (continued)"
+                current = continuation
             current += separator + block
     if current != header or not parts:
         parts.append(current)
@@ -669,7 +678,7 @@ async def response_view(session: AsyncSession, source_chat_id: int, target: date
         return {"parts": [format_estimate_missing(target)], "callback": None, "media": []}
     earlier = await schedule_rows(session, source_chat_id, target - timedelta(weeks=2), target - timedelta(weeks=1))
     text = format_orientation(target, earlier, latest)
-    return {"parts": split_day("📅 Schedule", [text]) if len(text) > MESSAGE_LIMIT else [text],
+    return {"parts": split_day("📅 Schedule", [text]) if units(text) > MESSAGE_LIMIT else [text],
             "callback": None, "media": []}
 
 

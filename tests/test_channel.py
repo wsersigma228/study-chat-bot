@@ -40,3 +40,13 @@ def test_estimate_render_discloses_unconfirmed_date(monkeypatch):
     text = "\n".join(asyncio.run(render(Session(), SimpleNamespace(chat_id=1, schedule_date=target))))
     assert "Estimated schedule" in text and "25.03.2030" in text and "not confirmed" in text
     assert "1. Algebra" in text and "Sources:" in text
+
+
+def test_oversized_link_lines_always_advance():
+    for line in ("https://example.invalid/" + "x" * 5000,
+                 "Homework: " + "📚" * 2500 + " https://t.me/c/101/1"):
+        parts = chunks("Demo schedule", [line])
+        assert 1 < len(parts) < 5
+        assert all(units(part) <= 4096 for part in parts)
+        assert sum(part.count("x") for part in parts) == line.count("x")
+        assert sum(part.count("📚") for part in parts) == line.count("📚")

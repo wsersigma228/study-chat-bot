@@ -59,3 +59,17 @@ def test_stale_commands_ignored_but_review_reply_retained():
     old.reply_to_message = SimpleNamespace(message_id=1)
     asyncio.run(ignore_stale_message(handler, old, {}))
     assert calls == ["Corrected assignment"]
+
+
+def test_long_homework_title_and_astral_text_do_not_hang():
+    import subprocess
+    import sys
+    subprocess.run([sys.executable, "-c", r"""
+from app.bot import split_day, units
+block = "Homework: " + "📚" * 5000 + "\nDeadline not stated"
+parts = split_day("Homework", [block, "Next lesson\nNo homework found"])
+assert 1 < len(parts) < 10
+assert all(units(part) <= 4000 for part in parts)
+assert sum(part.count("📚") for part in parts) == 5000
+assert "Next lesson" in parts[-1]
+"""], check=True, timeout=15)

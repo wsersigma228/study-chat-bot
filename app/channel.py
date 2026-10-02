@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.bot import (PROCESS_INSTANCE, WEEKDAYS, day_assignments, format_estimate_missing, homework_history, lesson_block,
-                     response_view, schedule_keyboard, schedule_rows, source_lines, source_references)
+                     response_view, schedule_keyboard, schedule_rows, source_lines, source_references, units)
 from app.models import BotResponse, ChannelPost, ScheduleDay, SourceChat
 from app.schedule import LOCAL_TIME, displayed_day, estimate_ready, upcoming_monday
 
@@ -27,12 +27,11 @@ def publication_delay(now: datetime) -> float:
     return min(10, (cutoff - now).total_seconds())
 
 
-def units(value: str) -> int:
-    return len(value.encode("utf-16-le")) // 2
-
-
 def chunks(header: str, lines: list[str]) -> list[str]:
     """Keep source URLs intact and label every part of a long day."""
+    continuation = header + " (continued)"
+    if units(continuation) >= LIMIT - 80:
+        raise ValueError("Publication header is too long")
     parts = []
     current = header
     for line in lines:
@@ -44,14 +43,15 @@ def chunks(header: str, lines: list[str]) -> list[str]:
             room = LIMIT - units(current) - 1
             if room < 80:
                 parts.append(current)
-                current = header + " (continued)"
+                current = continuation
                 continue
             if units(line) <= room:
                 current += "\n" + line
                 break
-            if line.startswith("https://") or "https://t.me/c/" in line:
+            # Keep links intact when they fit a fresh page; oversized input must still advance.
+            if (line.startswith("https://") or "https://t.me/c/" in line) and units(line) <= LIMIT - units(continuation) - 1:
                 parts.append(current)
-                current = header + " (continued)"
+                current = continuation
                 continue
             offset = 0
             while offset < len(line) and units(line[:offset + 1]) <= room:
@@ -59,7 +59,7 @@ def chunks(header: str, lines: list[str]) -> list[str]:
             current += "\n" + line[:offset]
             line = line[offset:]
             parts.append(current)
-            current = header + " (continued)"
+            current = continuation
     parts.append(current)
     return parts
 

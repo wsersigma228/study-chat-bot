@@ -20,9 +20,9 @@ Set BOT_TOKEN, BOT_OWNER_USER_ID and BOT_ALLOWED_CHAT_IDS for the groups that ma
 
 Leave BOT_CHANNEL_ID empty to disable channel publication. If enabled, use a destination distinct from source and command groups. The worker can publish and update destination messages. `channel-post --date YYYY-MM-DD` is an explicit publication command. An uncertain send requires inspecting the destination before using `--replace`.
 
-## Remote containers
+## Local containers during active work
 
-Run containers on your remote deployment host. Keep its .env and volumes private. Set POSTGRES_PASSWORD before using Compose; use a URL-safe password or percent-encode it in URLs. Inspect Git status and preserve local changes before updating code.
+Run containers locally only while actively working on this project. Keep .env and volumes private. Compose disables automatic restart; do not install an autostart service or deploy this project remotely. Set POSTGRES_PASSWORD before using Compose; use a URL-safe password or percent-encode it in URLs. Inspect Git status and preserve local changes before updating code.
 
 ```sh
 docker compose build
@@ -35,4 +35,6 @@ docker compose --profile live up -d bot collector
 
 The collector uses a named session volume in Compose. Authorize it within that same volume before starting collection. The collector's fingerprint path in Compose points inside the private export mount; the preparation script writes the fingerprint to that location. Do not substitute the offline example for your source group.
 
-Check the deployed Git commit, database migrations, container state and logs. Use `python -m app.telegram_cli status` with the same private configuration to inspect collection state. A healthy container does not prove successful collection or a real bot conversation. Preserve database, media and session volumes; never reset them during routine upgrades.
+When finished, run `docker compose --profile live stop` and verify that no project containers are running. Volumes are retained.
+
+Check the running Git commit, database migrations, container state and logs. Use `python -m app.telegram_cli status` with the same private configuration to inspect collection state. A healthy container does not prove successful collection or a real bot conversation. Preserve database, media and session volumes; never reset them during routine upgrades.

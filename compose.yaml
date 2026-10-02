@@ -1,3 +1,5 @@
+name: study-chat-local
+
 services:
   db:
     image: docker.io/library/postgres:15-alpine
@@ -12,9 +14,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    restart: unless-stopped
+    restart: "no"
 
   migrate:
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     image: localhost/study-chat-bot:local
     build: .
     command: ["alembic", "upgrade", "head"]
@@ -26,6 +30,8 @@ services:
         condition: service_healthy
 
   worker:
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     image: localhost/study-chat-bot:local
     command: ["python", "-m", "app.cli", "schedule-watch"]
     environment:
@@ -40,9 +46,11 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    restart: unless-stopped
+    restart: "no"
 
   bot:
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     image: localhost/study-chat-bot:local
     profiles: ["live"]
     command: ["python", "-m", "app.bot"]
@@ -60,9 +68,11 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    restart: unless-stopped
+    restart: "no"
 
   collector:
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     image: localhost/study-chat-bot:local
     profiles: ["live"]
     command: ["python", "-m", "app.telegram_cli", "collect"]
@@ -87,7 +97,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    restart: unless-stopped
+    restart: "no"
 
 volumes:
   postgres_data:

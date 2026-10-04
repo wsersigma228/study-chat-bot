@@ -23,7 +23,7 @@ The demo import was repeated: eight messages and eight revisions, with no new re
 - **Test dependency:** pytest was updated from 8.4.2 to 9.0.3 for [CVE-2025-71176](https://github.com/advisories/GHSA-6w46-j5rx-g56g).
 - **Build/runtime dependencies:** the build updates Debian packages, including the patched PCRE2 package for [CVE-2026-103111](https://security-tracker.debian.org/tracker/CVE-2026-103111). It uses pinned pip 26.2.1 during installation, checks dependency consistency, then removes pip and its unnecessary vendored libraries from the runtime image. Rebuild the image to change dependencies.
 - **Container privileges:** application services drop Linux capabilities and enable `no-new-privileges`. PostgreSQL retains the privileges required by its official entrypoint. No database ports or Docker socket are published to the host.
-- **Lifecycle:** this project uses the isolated `study-chat-local` Compose project, disables restart policies, and runs locally only during active work. All project services were stopped after verification; persistent volumes were retained.
+- **Lifecycle:** this project uses the isolated `study-chat-local` Compose project and disables restart policies. The original review used temporary local containers; current verification may also use an isolated Fedora environment with synthetic data and Telegram publication disabled. There is no permanent live deployment or autostart service for this public copy. Working volumes must be preserved; task-owned disposable resources may be removed after verification.
 
 ## Remaining findings and trust boundaries
 

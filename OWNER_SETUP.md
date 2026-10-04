@@ -20,9 +20,9 @@ Set BOT_TOKEN, BOT_OWNER_USER_ID and BOT_ALLOWED_CHAT_IDS for the groups that ma
 
 Leave BOT_CHANNEL_ID empty to disable channel publication. If enabled, use a destination distinct from source and command groups. The worker can publish and update destination messages. `channel-post --date YYYY-MM-DD` is an explicit publication command. An uncertain send requires inspecting the destination before using `--replace`.
 
-## Local containers during active work
+## Temporary containers during active work
 
-Run containers locally only while actively working on this project. Keep .env and volumes private. Compose disables automatic restart; do not install an autostart service or deploy this project remotely. Set POSTGRES_PASSWORD before using Compose; use a URL-safe password or percent-encode it in URLs. Inspect Git status and preserve local changes before updating code.
+For verification, run temporary isolated containers locally or on Fedora with synthetic data and Telegram publication disabled. Keep .env and any working volumes private. Compose disables automatic restart; this public project has no permanent live deployment or autostart service. The private tgdzbot application remains the owner's actively used Fedora service. Set POSTGRES_PASSWORD before using Compose; use a URL-safe password or percent-encode it in URLs. Inspect Git status and preserve changes before updating code. Remove only task-owned disposable resources after verification.
 
 ```sh
 docker compose build

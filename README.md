@@ -35,7 +35,7 @@ The parser uses deterministic rules. LLM, OCR, vision and document text extracti
 
 ## Quickstart
 
-**Requirements:** Docker with Compose. Run containers locally only during active work. The Compose project is `study-chat-local`, and services have automatic restarts disabled.
+**Requirements:** Docker with Compose. Use a temporary isolated environment locally or on Fedora during verification, with synthetic data and Telegram publication disabled. The Compose project is `study-chat-local`, and services have automatic restarts disabled.
 
 ### 1. Configure the offline environment
 
@@ -90,7 +90,7 @@ docker compose --profile live stop
 docker compose ps
 ```
 
-Keep the database, media and session volumes. The project is intended to run while actively in use, with no autostart service or remote deployment.
+Keep any working database, media and session volumes. After verification, remove only disposable resources created for the task after checking their ownership. This public project has no permanent live deployment or autostart service; private `tgdzbot` is the actively used Fedora application.
 
 ## Architecture
 
@@ -152,3 +152,9 @@ The source group, allowed command groups and publication channel are separate se
 | [examples/](examples/) | Invented English data with no shipped private media |
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md), [DOMAIN_RULES.md](DOMAIN_RULES.md) and [DATA_MODEL.md](DATA_MODEL.md) for the implementation boundaries.
+
+## License
+
+[MIT License](LICENSE). You may reuse and adapt the published code, including
+commercial use, while retaining its copyright and license notice. This license
+covers the public source release, not the owner's private Telegram data.

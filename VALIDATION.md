@@ -50,3 +50,19 @@ The rebuilt offline worker was checked again, including source checksums and
 logs. After verification, the task's temporary containers, two disposable volumes
 and empty network were removed after checking their ownership. The earlier
 volume retention above describes the initial check, before this follow-up.
+
+
+### Private/public counterpart verification
+
+Public code commit `69f7b30` adds an optional source fallback label while preserving
+its English default and Telegram URL. This lets the shared implementation also
+preserve the private counterpart's existing caller-specific localized output.
+The built public image again passed **61 tests with no skips** against a separate
+migrated PostgreSQL database; local checks passed **57, with 4 PostgreSQL skips**.
+The temporary database container, its task-owned volume and empty network were
+removed afterward. Equivalent assignment/view/override fixes were applied to the
+private counterpart using its original text and fixtures; none were copied here.
+
+The public release is now MIT-licensed. Both AGENTS.md files define the shared-fix
+policy and distinguish this open-source resume project from the actively used
+private application and its working data.

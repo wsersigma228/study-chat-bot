@@ -22,6 +22,8 @@ reparsing leaves stored overrides unchanged. Explicit null field values clear a
 deadline. When approved source revisions change, the projection is shown until the
 owner reviews it again. Legacy corrections without an approval snapshot retain
 their existing precedence. Updates assign a fresh JSON object for SQLAlchemy.
+The legacy reader can be removed only after a verified conversion of all stored
+flat overrides; retaining it now avoids an unnecessary eager data migration.
 
 `ScheduleDay.payload` remains JSONB, produced by `schedule.project()`: `state`,
 `date_basis`, `slots`, `source_ids`, `context_ids`, `inferences`, `source_revisions`

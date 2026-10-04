@@ -35,3 +35,18 @@ homework tasks and 3 schedule review candidates. The database health check and
 worker logs passed; source checksums in the running image matched the checkout.
 Project containers were stopped and removed after verification; volumes retained.
 No live bot, collector or channel delivery was exercised.
+
+### Compliance follow-up
+
+Code commit `c8d4f91` restores the original schedule timezone initialization
+boundary. The previous move to shared settings caused collector/database imports
+to load `.env` and fail on an invalid schedule timezone; this was reproduced and
+fixed without changing valid configuration behavior. A fresh-process regression
+test covers both effects. Local checks: **57 passed, 4 skipped**; rebuilt image
+with the separate PostgreSQL test database: **61 passed, no skips**. Independent
+startup checks: **11 passed**. Existing migrations remained at `0009_bot_responses`.
+
+The rebuilt offline worker was checked again, including source checksums and
+logs. After verification, the task's temporary containers, two disposable volumes
+and empty network were removed after checking their ownership. The earlier
+volume retention above describes the initial check, before this follow-up.

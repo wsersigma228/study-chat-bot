@@ -124,6 +124,8 @@ Database integration checks skip unless `TEST_DATABASE_URL` points to a separate
 
 **Verified on 2026-10-02:** 39 tests passed with a separate local PostgreSQL database; migrations reached `0009_bot_responses`. The local worker started successfully and all project containers were stopped after verification. This is a recorded check, not a CI badge. [Security findings and remaining risks](SECURITY.md).
 
+**Refactor verified on 2026-10-04:** 60 tests passed in the built image with a separate PostgreSQL test database. See [refactor verification](VALIDATION.md#refactor-verification---2026-10-04) for startup, compatibility and offline worker checks.
+
 Fixtures and fake Telegram adapters check implementation behavior. They do not prove a real collector event, Telegram conversation or channel delivery. See [VALIDATION.md](VALIDATION.md) for the verification boundaries.
 
 ## Optional live setup

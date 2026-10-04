@@ -10,4 +10,28 @@ Inspect the test output for skipped checks. Database integration requires a disp
 
 For the offline workflow, apply migrations, import examples/desktop-export.json twice, and compare import statistics. Repeating unchanged data should not create new revisions. Inspect schedule, homework, review states and unavailable attachment metadata using the README commands. The synthetic import does not confirm a live schedule publisher; schedule review candidates are expected, rather than verified schedules.
 
-No live Telegram result follows from offline fixtures or healthy containers. A real collector event, edit, restart reconciliation, bot conversation and channel publication need separate operator-controlled checks. This document supplies commands, not fabricated pass counts.
+No live Telegram result follows from offline fixtures or healthy containers. A real collector event, edit, restart reconciliation, bot conversation and channel publication need separate operator-controlled checks. Recorded checks below describe only their stated scope.
+
+## Refactor verification - 2026-10-04
+
+Code commit: `28c260c`. Local Python checks: **56 passed, 4 skipped** (PostgreSQL
+checks unavailable locally). The built Python 3.12 image with a separate migrated
+PostgreSQL test database: **60 passed, no skips**. This includes legacy and
+structured overrides surviving replay/source deletion, approval invalidation,
+explicit null deadlines, accept/dismiss/edit writes, repeated/unknown subjects,
+extra tasks and saved source callback fingerprints.
+
+Each bot/channel/review/collector/CLI import was checked in a fresh process;
+both CLI help entry points and bot startup with a direct `/today` handler call
+were checked without a database connection or Telegram requests. Independent
+review found no import cycles. Old/new output, source references and fingerprints
+matched for four histories containing twelve lesson blocks.
+
+Temporary container verification used only synthetic data and disabled Telegram
+publication. Both application and test databases reached existing migration
+`0009_bot_responses`; the refactor introduces no new migration. Import replay
+reported 8 created, then 8 unchanged; the offline worker produced 4 confirmed
+homework tasks and 3 schedule review candidates. The database health check and
+worker logs passed; source checksums in the running image matched the checkout.
+Project containers were stopped and removed after verification; volumes retained.
+No live bot, collector or channel delivery was exercised.

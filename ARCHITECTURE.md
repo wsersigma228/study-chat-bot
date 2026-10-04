@@ -24,8 +24,9 @@ helpers rather than inspecting the stored format. Models and projection SQL stay
 unchanged. The importer/collector still feed stored revisions into schedule and
 homework projections, which the CLI, views and publication code read.
 
-Environment loading and the shared timezone are centralized in
-`telegram_settings.py`. Timezone initialization still occurs on import to preserve
-existing host CLI and `.env` behavior. `MEDIA_ROOT` lookup in attachment checks and
-collector setup environment reads remain small future cleanup candidates; changing
-all their call sites is outside this refactor.
+The existing timezone initialization in `schedule.py` still loads `.env` on
+import. Startup-only initialization is deferred: changing it safely requires
+coordinating timezone consumers and preserving host CLI `.env` behavior. Moving
+it into the shared settings module would unnecessarily make collector/database
+imports validate schedule timezone settings. `MEDIA_ROOT` lookup in attachment
+checks and collector setup environment reads also remain future cleanup candidates.

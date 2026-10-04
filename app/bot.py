@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import engine
 from app.homework import catalog, effective
 from app.models import BotResponse, ChannelPost, Homework, HomeworkReviewNotice, ScheduleDay, SourceChat
-from app.telegram_settings import LOCAL_TIME
+from app.schedule import LOCAL_TIME
 from app.telegram_settings import load_env
 from app.telegram_sources import source_link
 from app.homework_selection import Assignment, day_assignments, homework_history

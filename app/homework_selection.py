@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.homework import effective
 from app.models import Homework, Message as StoredMessage, ScheduleDay, SourceChat
-from app.telegram_settings import LOCAL_TIME
+from app.schedule import LOCAL_TIME
 
 HomeworkEntry = tuple[Homework, int | None, date | None]
 Relation = Literal["explicit", "likely", "uncertain"]

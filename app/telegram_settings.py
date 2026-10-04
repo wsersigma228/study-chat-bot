@@ -3,7 +3,6 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 
 def load_env(path: Path = Path(".env")) -> None:
@@ -18,11 +17,6 @@ def load_env(path: Path = Path(".env")) -> None:
         if value[:1] in {"'", '"'} and value[-1:] == value[:1]:
             value = value[1:-1]
         os.environ.setdefault(key, value)
-
-
-# Shared timezone is initialized once before domain modules import it.
-load_env()
-LOCAL_TIME = ZoneInfo(os.getenv("STUDY_TIMEZONE", "UTC"))
 
 
 @dataclass(frozen=True)

@@ -14,7 +14,7 @@ from app.homework import catalog, effective
 from app.homework_selection import (Assignment, assignment_homework, confirmed_latest,
                                     day_assignments, homework_history)
 from app.models import Homework, Message as StoredMessage, ScheduleDay, SourceChat
-from app.telegram_settings import LOCAL_TIME
+from app.schedule import LOCAL_TIME
 from app.telegram_sources import source_link
 
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")

@@ -54,3 +54,19 @@ def test_shared_source_link():
     from app.telegram_sources import source_link
     assert source_link(-1000000000101, 7) == "https://t.me/c/101/7"
     assert source_link(None, 7) == source_link(-303, 7) == "message 7"
+
+
+def test_collector_and_database_imports_do_not_load_schedule_settings(tmp_path):
+    import os
+    from pathlib import Path
+
+    (tmp_path / ".env").write_text("STUDY_REFACTOR_SMOKE=loaded\n", encoding="utf-8")
+    runtime = os.environ.copy()
+    runtime["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+    runtime["STUDY_TIMEZONE"] = "Invalid/RefactorSmoke"
+    runtime.pop("STUDY_REFACTOR_SMOKE", None)
+    result = subprocess.run([sys.executable, "-c",
+        "import os; import app.telegram_settings, app.db, app.collector; "
+        "assert 'STUDY_REFACTOR_SMOKE' not in os.environ"],
+        cwd=tmp_path, env=runtime, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr

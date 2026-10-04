@@ -19,6 +19,35 @@ SPLIT = re.compile(r"^\s*(?:\d+[.)]|[-•])\s*(.+)$")
 POINTER = re.compile(r"(?:homework|hw)\s*[👆↑\s]*", re.I)
 
 
+def owner_override_parts(raw: dict | None) -> tuple[dict, dict]:
+    """Read both stored formats; legacy approvals belong to metadata, not fields."""
+    raw = raw or {}
+    if "fields" in raw:
+        return dict(raw["fields"]), dict(raw.get("meta", {}))
+    fields = {key: value for key, value in raw.items() if key != "_approved_sources"}
+    meta = {"approved_sources": raw["_approved_sources"]} if "_approved_sources" in raw else {}
+    return fields, meta
+
+
+def effective(item: Homework, field: str):
+    fields, meta = owner_override_parts(item.owner_override)
+    if "approved_sources" in meta and meta["approved_sources"] != item.sources:
+        return getattr(item, field)
+    return fields.get(field, getattr(item, field))
+
+
+def update_owner_override(item: Homework, changes: dict) -> dict:
+    """Normalize on owner action, preserving earlier corrections and metadata.
+
+    Return a new dict so SQLAlchemy detects the JSONB update. Reparsing leaves
+    existing overrides untouched; no eager database migration is necessary.
+    """
+    fields, meta = owner_override_parts(item.owner_override)
+    fields.update(changes)
+    meta["approved_sources"] = item.sources
+    return {"fields": fields, "meta": meta}
+
+
 def catalog():
     data = json.loads(Path("config/subjects.json").read_text(encoding="utf-8"))
     names = {item["key"]: item["name"] for item in data["subjects"]}

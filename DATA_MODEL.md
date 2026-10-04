@@ -11,3 +11,21 @@
 - `bot_responses`: persisted bot response references for refreshes.
 
 See app/models.py and migrations/ for the authoritative columns and constraints. Desktop export IDs, live Telegram peers and internal database row IDs are different identifiers.
+
+## Owner corrections and schedule JSON
+
+New owner actions store `homework.owner_override` as
+`{"fields": {...}, "meta": {"approved_sources": [...]}}`. The centralized helpers in
+`homework.py` also read legacy flat overrides, moving `_approved_sources` into
+metadata on the next owner action. No schema or data migration is required;
+reparsing leaves stored overrides unchanged. Explicit null field values clear a
+deadline. When approved source revisions change, the projection is shown until the
+owner reviews it again. Legacy corrections without an approval snapshot retain
+their existing precedence. Updates assign a fresh JSON object for SQLAlchemy.
+
+`ScheduleDay.payload` remains JSONB, produced by `schedule.project()`: `state`,
+`date_basis`, `slots`, `source_ids`, `context_ids`, `inferences`, `source_revisions`
+and `warnings`. Slot fields include `number`, `raw_subject`, `subject_key` and
+`room`. An estimated view copies this payload and adds `estimate_source_date`;
+it does not persist an estimated row. Separate slot tables are unnecessary while
+consumers read complete days without SQL filters over individual lessons.

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.bot import BotSettings
 from app.channel import prepare_schedule_posts, publish_one
-from app.homework import sync_homework
+from app.homework import effective, sync_homework
 from app.importer import import_export
 from app.models import Homework, Message, SourceChat
 from app.schedule import sync_schedule
@@ -62,7 +62,8 @@ def test_publication_sends_once_and_keeps_timeouts_uncertain(monkeypatch, timeou
     assert bot.sends == 1
 
 
-def test_migrated_postgresql_replay_preserves_owner_changes(tmp_path):
+@pytest.mark.parametrize("structured", [False, True])
+def test_migrated_postgresql_replay_preserves_owner_changes(tmp_path, structured):
     url = os.getenv("TEST_DATABASE_URL")
     if not url:
         pytest.skip("Set TEST_DATABASE_URL for PostgreSQL integration")
@@ -87,7 +88,9 @@ def test_migrated_postgresql_replay_preserves_owner_changes(tmp_path):
                 chat_id = chat.id
                 task = await session.scalar(select(Homework).where(Homework.chat_id == chat_id))
                 task_id = task.id
-                task.owner_override = {"text": "Owner correction"}
+                override = ({"fields": {"text": "Owner correction"}, "meta": {}}
+                            if structured else {"text": "Owner correction"})
+                task.owner_override = override
                 await session.commit()
             raw["text"] = "Geometry homework: draw a rectangle"
             raw["edited_unixtime"] = "1901870460"
@@ -98,7 +101,7 @@ def test_migrated_postgresql_replay_preserves_owner_changes(tmp_path):
                 await sync_homework(session)
             async with AsyncSession(db) as session:
                 task = await session.get(Homework, task_id)
-                assert task.subject_key == "geometry" and task.owner_override["text"] == "Owner correction"
+                assert task.subject_key == "geometry" and effective(task, "text") == "Owner correction" and task.owner_override == override
                 source = await session.scalar(select(Message).where(Message.chat_id == chat_id))
                 source.deleted_at = datetime.now(timezone.utc)
                 await session.commit()
@@ -106,7 +109,7 @@ def test_migrated_postgresql_replay_preserves_owner_changes(tmp_path):
                 await sync_homework(session)
             async with AsyncSession(db) as session:
                 task = await session.get(Homework, task_id)
-                assert task.reason == "source_deleted" and task.owner_override["text"] == "Owner correction"
+                assert task.reason == "source_deleted" and effective(task, "text") == "Owner correction" and task.owner_override == override
         finally:
             if chat_id:
                 async with AsyncSession(db) as session, session.begin():

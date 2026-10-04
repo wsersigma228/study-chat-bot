@@ -17,6 +17,7 @@ from app.homework import sync_homework
 from app.models import Attachment, ChannelPost, Homework, Message, MessageRevision, ScheduleDay, ScheduleReview, SourceChat
 from app.schedule import LOCAL_TIME, sync_schedule
 from app.telegram_settings import load_env
+from app.telegram_sources import source_link
 
 
 async def summary(session: AsyncSession):
@@ -71,12 +72,6 @@ async def show(session: AsyncSession, message_id: int):
             f"source={item.source_status}; local={item.local_status}; "
             f"declared_bytes={item.declared_size if item.declared_size is not None else '-'}"
         )
-
-
-def source_link(peer_id: int | None, message_id: int) -> str:
-    if peer_id is not None and str(peer_id).startswith("-100"):
-        return f"https://t.me/c/{-peer_id - 1_000_000_000_000}/{message_id}"
-    return f"message {message_id}"
 
 
 async def show_schedule(session: AsyncSession, target: date):

@@ -9,7 +9,9 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, FSInputFil
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.homework import catalog
+from app.homework import catalog, owner_override_parts, update_owner_override
+from app.study_view import sendable_path
+from app.telegram_sources import source_link
 from app.models import Homework, HomeworkReviewNotice, SourceChat
 from app.schedule import subject_aliases
 
@@ -19,10 +21,10 @@ REVIEW_REASONS = {"unread_photo", "subject_not_established"}
 def needs_owner_review(item: Homework) -> bool:
     if item.status != "needs_review" or item.reason not in REVIEW_REASONS:
         return False
-    override = item.owner_override or {}
-    if "_approved_sources" in override:
-        return override["_approved_sources"] != item.sources
-    return not override.get("status")
+    fields, meta = owner_override_parts(item.owner_override)
+    if "approved_sources" in meta:
+        return meta["approved_sources"] != item.sources
+    return not fields.get("status")
 
 
 def parse_correction(text: str, current_subject: str | None) -> dict:
@@ -57,8 +59,6 @@ def parse_correction(text: str, current_subject: str | None) -> dict:
 
 async def notify_one(factory: async_sessionmaker[AsyncSession], bot: Bot, owner_id: int,
                      homework_id: int, *, force: bool = False) -> str:
-    from app.bot import sendable_path, source_link
-
     async with factory() as session, session.begin():
         item = await session.get(Homework, homework_id, with_for_update=True)
         if item is None or not needs_owner_review(item):
@@ -154,12 +154,11 @@ async def accept_review(session: AsyncSession, homework_id: int, notification_id
                 or notice.status != "sent" or notice.notification_message_id != notification_id
                 or notice.source_updated_at != item.updated_at or not item.subject_key):
             return False
-        override = dict(item.owner_override or {})
-        override.update(status="confirmed", subject_key=item.subject_key,
-                        _approved_sources=item.sources,
-                        text=("Assignment in a photo; content confirmed by the owner" if item.reason == "unread_photo"
-                              else item.text))
-        item.owner_override = override
+        item.owner_override = update_owner_override(item, {
+            "status": "confirmed", "subject_key": item.subject_key,
+            "text": ("Assignment in a photo; content confirmed by the owner"
+                     if item.reason == "unread_photo" else item.text),
+        })
         item.updated_at = datetime.now(timezone.utc)
         notice.status = "resolved"
         notice.updated_at = item.updated_at
@@ -174,8 +173,7 @@ async def dismiss_review(session: AsyncSession, homework_id: int, notification_i
                 or notice.status != "sent" or notice.notification_message_id != notification_id
                 or notice.source_updated_at != item.updated_at):
             return False
-        item.owner_override = {**(item.owner_override or {}), "status": "dismissed",
-                               "_approved_sources": item.sources}
+        item.owner_override = update_owner_override(item, {"status": "dismissed"})
         item.updated_at = datetime.now(timezone.utc)
         notice.status = "resolved"
         notice.updated_at = item.updated_at
@@ -210,8 +208,7 @@ async def finish_edit(session: AsyncSession, prompt_id: int, text: str) -> tuple
             correction = parse_correction(text, item.subject_key)
         except ValueError as exc:
             return False, str(exc)
-        item.owner_override = {**(item.owner_override or {}), **correction,
-                               "_approved_sources": item.sources}
+        item.owner_override = update_owner_override(item, correction)
         item.updated_at = datetime.now(timezone.utc)
         notice.status = "resolved"
         notice.updated_at = item.updated_at

@@ -2,7 +2,8 @@ import hashlib
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from app.bot import effective, format_homework, sendable_path
+from app.homework import effective
+from app.study_view import format_homework, sendable_path
 from app.homework import due_date, project
 from tests.helpers import attachment, message
 

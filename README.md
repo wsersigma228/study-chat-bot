@@ -140,6 +140,9 @@ The source group, allowed command groups and publication channel are separate se
 | [app/collector.py](app/collector.py) | Confirmed source binding, live events and history reconciliation |
 | [app/schedule.py](app/schedule.py) | Schedule parsing, daily projections and labeled estimates |
 | [app/homework.py](app/homework.py) | Homework evidence, deadlines and uncertainty |
+| [app/homework_selection.py](app/homework_selection.py) | History and named lesson assignments |
+| [app/study_view.py](app/study_view.py) | Shared command/channel views and source references |
+| [app/telegram_sources.py](app/telegram_sources.py) | Telegram source URLs |
 | [app/homework_review.py](app/homework_review.py) | Durable owner review and corrections |
 | [app/bot.py](app/bot.py) | Access checks, commands and saved responses |
 | [app/channel.py](app/channel.py) | Publication, updates and reconciliation |

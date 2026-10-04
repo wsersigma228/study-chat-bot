@@ -1,23 +1,17 @@
 """Deterministic text schedule parsing and projection from saved messages."""
 
 import json
-import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ChannelPost, ChannelState, Message, ScheduleDay, ScheduleReview, SourceChat
-from app.telegram_settings import load_env
-
-
-load_env()
-LOCAL_TIME = ZoneInfo(os.getenv("STUDY_TIMEZONE", "UTC"))
+from app.telegram_settings import LOCAL_TIME
 
 
 def upcoming_monday(now: datetime) -> date:

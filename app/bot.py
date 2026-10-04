@@ -1,13 +1,11 @@
 """Owner-controlled schedule bot. It reads PostgreSQL and never opens Telethon."""
 
 import asyncio
-import hashlib
 import json
 import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.exceptions import TelegramAPIError
@@ -15,7 +13,7 @@ from aiogram.types import FSInputFile
 from aiogram.types import (
     BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats,
     BotCommandScopeDefault,
-    CallbackQuery, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageOriginChannel,
+    CallbackQuery, ForceReply, MessageOriginChannel,
 )
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import Message
@@ -23,17 +21,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import engine
-from app.homework import catalog
-from app.models import BotResponse, ChannelPost, Homework, HomeworkReviewNotice, Message as StoredMessage, ScheduleDay, SourceChat
-from app.schedule import LOCAL_TIME
+from app.homework import catalog, effective
+from app.models import BotResponse, ChannelPost, Homework, HomeworkReviewNotice, ScheduleDay, SourceChat
+from app.telegram_settings import LOCAL_TIME
 from app.telegram_settings import load_env
+from app.telegram_sources import source_link
+from app.homework_selection import Assignment, day_assignments, homework_history
+from app.study_view import (format_missing, schedule_keyboard, schedule_rows,
+                            format_homework, day_source_callback,
+                            homework_source_callback, source_references, source_lines,
+                            sendable_path, response_view, split_day)
 
 
 SCHEDULE_USAGE = "Usage: /schedule 08-04-30"
 HOMEWORK_USAGE = "Usage: /homework or /homework 08-04-30"
-WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-SHORT_WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
-MESSAGE_LIMIT = 4000
 MAX_MESSAGE_AGE = timedelta(minutes=5)
 PROCESS_INSTANCE = f"{os.getenv('HOSTNAME', 'local')}:{os.getpid()}"
 
@@ -112,86 +113,6 @@ def parse_user_date(value: str | None) -> date:
         raise ValueError(SCHEDULE_USAGE) from exc
 
 
-def source_link(peer_id: int | None, message_id: int) -> str:
-    if peer_id is not None and str(peer_id).startswith("-100"):
-        return f"https://t.me/c/{-peer_id - 1_000_000_000_000}/{message_id}"
-    return f"message {message_id}"
-
-
-def format_day(target: date, payload: dict, peer_id: int) -> str:
-    lines = [f"{target:%d.%m.%Y}, {WEEKDAYS[target.weekday()]}"]
-    if payload.get("state") != "verified":
-        lines.append("Status: needs review")
-    for slot in payload["slots"]:
-        room = f" (room {slot['room']})" if slot.get("room") else ""
-        lines.append(f"{slot['number']}. {slot['raw_subject']}{room}")
-    return "\n".join(lines)
-
-
-def format_missing(target: date) -> str:
-    return f"{target:%d.%m.%Y}: The schedule for this date has not been published yet"
-
-
-def format_estimate_missing(target: date) -> str:
-    return (format_missing(target) + "\nAn estimate is unavailable: no confirmed "
-            "schedule from 14 or 7 days before this date.")
-
-
-def format_orientation(target: date, rows: list, latest: dict | None = None) -> str:
-    previous = {day.schedule_date: (day, peer) for day, peer in rows
-                if day.payload.get("state") == "verified"}
-    sections = [format_missing(target)]
-    shown = set()
-    for weeks in (1, 2):
-        past = target - timedelta(weeks=weeks)
-        if past not in previous:
-            continue
-        day, peer = previous[past]
-        sources = ", ".join(source_link(peer, message_id)
-                            for message_id in day.payload.get("source_ids", [])) or "link unavailable"
-        section = f"Reference ({weeks} weeks ago):\n{format_day(past, day.payload, peer)}\nSource: {sources}"
-        for slot in day.payload["slots"]:
-            subject = slot.get("subject_key")
-            if subject and subject not in shown and latest and subject in latest:
-                item, item_peer, published = latest[subject]
-                section += ("\n\nFor reference: latest confirmed homework for the subject; "
-                            "connection to the future lesson is unconfirmed\n"
-                            + format_homework(item, item_peer, published, compact=True, relation="uncertain"))
-                shown.add(subject)
-        sections.append(section)
-    if len(sections) > 1:
-        sections.append("These are past posts; alternating weekly schedules may differ. The selected date is unconfirmed.")
-    return "\n\n".join(sections)
-
-
-def schedule_keyboard(source_callback: str | None = None, *, shown: bool = False,
-                      today: date | None = None, week_start: date | None = None) -> InlineKeyboardMarkup:
-    today = today or datetime.now(LOCAL_TIME).date()
-    monday = today - timedelta(days=today.weekday())
-    selected = week_start or monday
-    if selected not in {monday, monday + timedelta(weeks=1)}:
-        selected = monday
-    next_week = selected == monday
-    toggle = monday + timedelta(weeks=1) if next_week else monday
-    buttons = [[
-        InlineKeyboardButton(text="Next week" if next_week else "Previous week",
-                             callback_data=f"schedule:week:{toggle.isoformat()}"),
-    ]]
-    weekdays = []
-    for offset, name in enumerate(SHORT_WEEKDAYS):
-        day = selected + timedelta(days=offset)
-        label = " · today" if day == today else " · tomorrow" if day == today + timedelta(days=1) else ""
-        weekdays.append(InlineKeyboardButton(
-            text=f"{name} {day:%d.%m}{label}", callback_data=f"schedule:date:{day.isoformat()}",
-        ))
-    buttons.extend((weekdays[:3], weekdays[3:]))
-    if source_callback:
-        buttons.append([InlineKeyboardButton(
-            text="Sources shown" if shown else "Sources", callback_data=source_callback,
-        )])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
 def period(kind: str, today: date | None = None) -> date:
     today = today or datetime.now(LOCAL_TIME).date()
     if kind == "today":
@@ -232,363 +153,6 @@ async def register_commands(bot: Bot) -> None:
     )
 
 
-async def schedule_texts(
-    session: AsyncSession, source_chat_id: int, start: date, end: date | None = None,
-) -> list[str]:
-    rows = await schedule_rows(session, source_chat_id, start, end or start)
-    return [format_day(day.schedule_date, day.payload, peer_id) for day, peer_id in rows]
-
-
-async def schedule_rows(session: AsyncSession, source_chat_id: int, start: date, end: date):
-    return (await session.execute(
-        select(ScheduleDay, SourceChat.telegram_peer_id)
-        .join(SourceChat, ScheduleDay.chat_id == SourceChat.id)
-        .where(SourceChat.telegram_peer_id == source_chat_id,
-               ScheduleDay.schedule_date >= start, ScheduleDay.schedule_date <= end)
-        .order_by(ScheduleDay.schedule_date)
-    )).all()
-
-
-def effective(item: Homework, field: str):
-    override = item.owner_override or {}
-    if "_approved_sources" in override and override["_approved_sources"] != item.sources:
-        return getattr(item, field)
-    return override.get(field, getattr(item, field))
-
-
-def format_homework(item: Homework, peer_id: int | None, published: date | None = None,
-                    *, compact: bool = False, relation: str | None = None) -> str:
-    names, _ = catalog()
-    subject = names.get(effective(item, "subject_key"), "Subject unknown")
-    due = effective(item, "due_date")
-    relative_due = effective(item, "due_text")
-    if isinstance(due, str):
-        due = date.fromisoformat(due)
-    lines = [f"📌 Homework: {effective(item, 'text')}" if compact else f"📌 {subject}: {effective(item, 'text')}"]
-    if due:
-        lines.append(f"Due: {due:%d.%m.%Y}")
-    elif relative_due:
-        lines.append(f"Teacher deadline: {relative_due}")
-        if relation == "uncertain":
-            lines.append("⚠️ Connection to this lesson is unconfirmed")
-    elif relation == "likely":
-        lines.append("probably for this lesson; teacher deadline unspecified")
-    elif relation == "uncertain":
-        lines.extend(("Homework for the subject",
-                      "⚠️ Connection to this lesson is unconfirmed; teacher deadline unspecified"))
-    else:
-        lines.append("Latest homework found for the subject; deadline unspecified")
-    if published:
-        lines.append(f"Published: {published:%d-%m-%y}")
-    lines.append(f"Source: {source_link(peer_id, item.root_message_id)}")
-    if effective(item, "status") != "confirmed":
-        lines.insert(0, "⚠️ Possible homework; unconfirmed")
-    else:
-        lines.append("✅ Homework confirmed")
-    for media in item.attachments:
-        name = media["name"] or media["kind"]
-        availability = "file available" if sendable_path(media) else "file unavailable to the bot"
-        link = f" · {source_link(peer_id, media['message_id'])}" if media["message_id"] != item.root_message_id else ""
-        entry = f"Attachment: {name} ({availability}){link}"
-        if entry not in lines:
-            lines.append(entry)
-    return "\n".join(lines)
-
-
-async def homework_history(session: AsyncSession, source_chat_id: int, as_of: date):
-    """Return confirmed current revisions in publication order for each subject."""
-    rows = (await session.execute(
-        select(Homework, SourceChat.telegram_peer_id, StoredMessage)
-        .join(SourceChat, Homework.chat_id == SourceChat.id)
-        .join(StoredMessage, (StoredMessage.chat_id == Homework.chat_id) &
-              (StoredMessage.telegram_message_id == Homework.root_message_id))
-        .where(SourceChat.telegram_peer_id == source_chat_id)
-        .order_by(StoredMessage.sent_at.desc(), StoredMessage.telegram_message_id.desc(),
-                  Homework.part_index.desc())
-    )).all()
-    history = {}
-    source_ids = {entry["message_id"] for item, _, _ in rows for entry in item.sources}
-    source_rows = (await session.scalars(select(StoredMessage).where(
-        StoredMessage.telegram_message_id.in_(source_ids),
-        StoredMessage.chat_id.in_({item.chat_id for item, _, _ in rows}),
-    ))).all() if source_ids else []
-    sources = {(source.chat_id, source.telegram_message_id): source for source in source_rows}
-    for item, peer, source in rows:
-        published = source.sent_at.astimezone(LOCAL_TIME).date()
-        if published > as_of or source.deleted_at or effective(item, "status") not in {"confirmed", "needs_review"}:
-            continue
-        # Current projection cannot reconstruct an edit or addition made after a past date.
-        if as_of < datetime.now(LOCAL_TIME).date() and any(
-            (linked := sources.get((item.chat_id, entry["message_id"]))) is None
-            or linked.sent_at.astimezone(LOCAL_TIME).date() > as_of
-            or (linked.edited_at and linked.edited_at.astimezone(LOCAL_TIME).date() > as_of)
-            or linked.deleted_at
-            for entry in item.sources
-        ):
-            continue
-        subject = effective(item, "subject_key")
-        if not subject:
-            continue
-        history.setdefault(subject, []).append((item, peer, published))
-    return history
-
-
-async def homework_rows(session: AsyncSession, source_chat_id: int, as_of: date):
-    history = await homework_history(session, source_chat_id, as_of)
-    return confirmed_latest(history)
-
-
-def confirmed_latest(history: dict):
-    latest = {}
-    for subject, items in history.items():
-        if selected := next((entry for entry in items if effective(entry[0], "status") == "confirmed"), None):
-            latest[subject] = selected
-    return latest
-
-
-def day_assignments(day: ScheduleDay, history: dict, days: list[ScheduleDay]):
-    """Select by current verified subject chronology without changing teacher due dates."""
-    result = []
-    shown = set()
-    target = day.schedule_date
-    for slot in day.payload["slots"]:
-        subject = slot.get("subject_key")
-        repeated = bool(subject and subject in shown)
-        if subject:
-            shown.add(subject)
-        if repeated or not subject:
-            result.append((slot, None, None, repeated, None))
-            continue
-        earlier = [row.schedule_date for row in days if row.schedule_date < target
-                   and row.payload.get("state") == "verified"
-                   and any(part.get("subject_key") == subject for part in row.payload["slots"])]
-        previous_lesson = max(earlier, default=None)
-        complete = previous_lesson is not None and day.payload.get("state") == "verified"
-        if complete:
-            known = {row.schedule_date for row in days if row.payload.get("state") == "verified"}
-            check = previous_lesson + timedelta(days=1)
-            while check < target:
-                if check.weekday() < 5 and check not in known:
-                    complete = False
-                    break
-                check += timedelta(days=1)
-        entries = history.get(subject, [])
-        chosen = None
-        relation = None
-        for entry in entries:
-            item, _, published = entry
-            due = effective(item, "due_date")
-            due = date.fromisoformat(due) if isinstance(due, str) else due
-            if due == target and effective(item, "status") == "confirmed":
-                chosen, relation = entry, "explicit"
-                break
-        if chosen is None:
-            for entry in entries:
-                item, _, published = entry
-                if effective(item, "status") == "confirmed" and effective(item, "due_date") is None and effective(item, "due_text"):
-                    if previous_lesson is None or previous_lesson <= published < target:
-                        chosen, relation = entry, "explicit" if complete else "uncertain"
-                        break
-        if chosen is None:
-            for entry in entries:
-                item, _, published = entry
-                due = effective(item, "due_date")
-                if isinstance(due, str):
-                    due = date.fromisoformat(due)
-                if (effective(item, "status") == "confirmed" and due is None
-                        and not effective(item, "due_text") and complete and previous_lesson <= published < target):
-                    chosen, relation = entry, "likely"
-                    break
-        if chosen is None:
-            # A dated task for another lesson is not a fallback for this one.
-            chosen, relation = next(((entry, "uncertain") for entry in entries
-                                     if effective(entry[0], "status") == "confirmed"
-                                     and effective(entry[0], "due_date") is None), (None, None))
-        pending = None
-        for entry in entries:
-            if chosen and entry[0].id == chosen[0].id:
-                break
-            due = effective(entry[0], "due_date")
-            if isinstance(due, str):
-                due = date.fromisoformat(due)
-            if effective(entry[0], "status") == "needs_review" and due in {None, target}:
-                pending = entry
-                break
-        if pending and chosen:
-            relation = "uncertain"
-        extras = []
-        for entry in entries:
-            item, _, published = entry
-            if effective(item, "status") != "confirmed" or (chosen and item.id == chosen[0].id):
-                continue
-            due = effective(item, "due_date")
-            due = date.fromisoformat(due) if isinstance(due, str) else due
-            in_interval = previous_lesson is not None and previous_lesson <= published < target
-            if due == target:
-                extras.append((entry, "explicit"))
-            elif due is None and in_interval:
-                extra_relation = ("explicit" if effective(item, "due_text") else "likely") if complete else "uncertain"
-                extras.append((entry, "uncertain" if pending else extra_relation))
-        result.append((slot, chosen, pending, False, relation, extras))
-    return result
-
-
-def assignment_homework(assignment):
-    """Include additional tasks while accepting existing five-field assignments."""
-    if assignment[1]:
-        yield assignment[1], assignment[4]
-    if len(assignment) > 5:
-        yield from assignment[5]
-
-
-def source_fingerprint(payload: dict, assignments: list) -> str:
-    selected = []
-    for assignment in assignments:
-        choices = [entry for entry, _ in assignment_homework(assignment)] + [assignment[2]]
-        for choice in choices:
-            if choice:
-                item = choice[0]
-                selected.append((item.id, item.subject_key, item.text, item.due_date,
-                                 item.due_text, item.status, item.sources, item.attachments,
-                                 item.owner_override))
-    raw = json.dumps([payload, selected], sort_keys=True, default=str, ensure_ascii=False)
-    return hashlib.sha256(raw.encode()).hexdigest()[:10]
-
-
-def day_source_callback(day: ScheduleDay, mode: str, as_of: date, assignments: list) -> str:
-    return f"src:d:{day.id}:{mode}:{as_of:%y%m%d}:{source_fingerprint(day.payload, assignments)}"
-
-
-def homework_source_callback(item: Homework) -> str:
-    return f"src:h:{item.id}:{source_fingerprint({}, [(None, (item, None, None), None, False, None)])}"
-
-
-def lesson_block(assignment) -> str:
-    slot, chosen, pending, repeated, relation = assignment[:5]
-    room = f" (room {slot['room']})" if slot.get("room") else ""
-    lines = [f"{slot['number']}. {slot['raw_subject']}{room}"]
-    if repeated:
-        lines.append("Homework is shown with the first lesson for this subject.")
-    elif chosen:
-        shown_tasks = set()
-        for entry, task_relation in assignment_homework(assignment):
-            item, peer, published = entry
-            task_key = (effective(item, "text"), str(effective(item, "due_date")),
-                        effective(item, "due_text"), json.dumps(item.attachments, sort_keys=True))
-            if task_key in shown_tasks:
-                lines.append(f"Assignment reminder: {published:%d-%m-%y}; source: {source_link(peer, item.root_message_id)}")
-                continue
-            shown_tasks.add(task_key)
-            lines.extend(format_homework(item, peer, published, compact=True, relation=task_relation).splitlines())
-        if pending:
-            lines.insert(1, "For reference: confirmed homework")
-    else:
-        lines.append("No current homework found.")
-    if pending:
-        item, peer, published = pending
-        lines.extend(("", "⚠️ New homework is awaiting confirmation.",
-                      f"Published: {published:%d-%m-%y}",
-                      f"New homework source: {source_link(peer, item.root_message_id)}"))
-    return "\n".join(lines)
-
-
-def source_references(day: ScheduleDay | None, assignments: list) -> list[tuple[str, int]]:
-    refs = []
-    if day:
-        refs.extend(("Schedule", message_id) for message_id in dict.fromkeys(day.payload.get("source_ids", [])))
-    roles = {"instruction": "instruction", "context": "context", "addition": "addition",
-             "material": "material", "pointer": "pointer"}
-    for assignment in assignments:
-        slot = assignment[0]
-        choices = [entry for entry, _ in assignment_homework(assignment)] + [assignment[2]]
-        for selected in choices:
-            if not selected:
-                continue
-            item = selected[0]
-            subject = slot["raw_subject"] if slot else catalog()[0].get(effective(item, "subject_key"), "Homework")
-            refs.extend((f"Homework {subject}: {roles.get(source['role'], source['role'])}", source["message_id"])
-                        for source in item.sources)
-            for media in item.attachments:
-                kind = "presentation" if (media["name"] or "").lower().endswith((".ppt", ".pptx")) else "file"
-                refs.append((f"{kind} {media['name'] or media['kind']}", media["message_id"]))
-    return list(dict.fromkeys(refs))
-
-
-async def source_lines(session: AsyncSession, chat_id: int, peer_id: int | None,
-                       refs: list[tuple[str, int]]) -> list[str]:
-    ids = {message_id for _, message_id in refs}
-    messages = (await session.scalars(select(StoredMessage).where(
-        StoredMessage.chat_id == chat_id, StoredMessage.telegram_message_id.in_(ids)
-    ))).all() if ids else []
-    known = {item.telegram_message_id: item for item in messages}
-    grouped = {}
-    for label, message_id in refs:
-        labels = grouped.setdefault((chat_id, message_id), [])
-        if label not in labels:
-            labels.append(label)
-    lines = []
-    for (_, message_id), labels in grouped.items():
-        label = ", ".join(labels)
-        source = known.get(message_id)
-        if source is None or source.deleted_at:
-            lines.append(f"{message_id} — {label} (message unavailable)")
-        elif peer_id is None or not str(peer_id).startswith("-100"):
-            lines.append(f"{message_id} — {label} (link unavailable)")
-        else:
-            lines.append(f"{message_id} — {label}: {source_link(peer_id, message_id)} (for source group members)")
-    return lines or ["No sources found"]
-
-
-def units(value: str) -> int:
-    return len(value.encode("utf-16-le")) // 2
-
-
-def split_day(header: str, blocks: list[str], *, separator: str = "\n\n") -> list[str]:
-    """Split at lesson boundaries; keep every part within Telegram's UTF-16 limit."""
-    continuation = header + ' (continued)'
-    if units(continuation) >= MESSAGE_LIMIT - 80:
-        raise ValueError("Message header is too long")
-    parts, current = [], header
-    for block in blocks:
-        if units(continuation + separator + block) > MESSAGE_LIMIT:
-            if current != header:
-                parts.append(current)
-            title, newline, body = block.partition("\n")
-            # Homework's first line can contain the entire untrusted task, not a short title.
-            if not newline or units(continuation + "\n" + title + ' — continued') >= MESSAGE_LIMIT - 80:
-                title, body = 'Entry', block
-            prefix = f"{header}\n{title}"
-            while body:
-                width = MESSAGE_LIMIT - units(prefix) - 1
-                piece = body.encode("utf-16-le")[:width * 2].decode("utf-16-le", errors="ignore")
-                parts.append(prefix + "\n" + piece)
-                body = body[len(piece):]
-                prefix = f"{continuation}\n{title}" + ' — continued'
-            current = header
-        else:
-            if units(current + separator + block) > MESSAGE_LIMIT:
-                parts.append(current)
-                current = continuation
-            current += separator + block
-    if current != header or not parts:
-        parts.append(current)
-    return parts
-
-
-def sendable_path(media: dict) -> Path | None:
-    if not media.get("bot_sendable") or not media.get("storage_key"):
-        return None
-    root = Path(os.getenv("MEDIA_ROOT", "private/media")).resolve()
-    path = (root / media["storage_key"]).resolve()
-    if not path.is_relative_to(root) or not path.is_file():
-        return None
-    if media.get("sha256"):
-        with path.open("rb") as stream:
-            if hashlib.file_digest(stream, "sha256").hexdigest() != media["sha256"]:
-                return None
-    return path
-
-
 async def send_homework(message: Message, items: list[tuple[Homework, int, date]]) -> None:
     sent_media = set()
     for item, peer, published in items:
@@ -612,74 +176,6 @@ async def send_media(message: Message, items: list[Homework], sent_media: set) -
                 await message.answer_photo(file)
             else:
                 await message.answer_document(file)
-
-
-async def response_view(session: AsyncSession, source_chat_id: int, target: date, kind: str = "schedule") -> dict:
-    from app.schedule import displayed_day, estimate_ready
-
-    today = datetime.now(LOCAL_TIME).date()
-    as_of = min(target, today)
-    chat = await session.scalar(select(SourceChat).where(SourceChat.telegram_peer_id == source_chat_id))
-    if chat is None:
-        return {"parts": [format_missing(target)], "callback": None, "media": []}
-    history = await homework_history(session, source_chat_id, as_of)
-    latest = confirmed_latest(history)
-    media = []
-    callback = None
-    if kind == "homework":
-        names, _ = catalog()
-        blocks = []
-        for subject, entries in history.items():
-            selected = latest.get(subject)
-            pending = None
-            for entry in entries:
-                if selected and entry[0].id == selected[0].id:
-                    break
-                due = effective(entry[0], "due_date")
-                due = date.fromisoformat(due) if isinstance(due, str) else due
-                if effective(entry[0], "status") == "needs_review" and (due is None or due >= target):
-                    pending = entry
-                    break
-            if selected:
-                due = effective(selected[0], "due_date")
-                due = date.fromisoformat(due) if isinstance(due, str) else due
-                if due and due < target:
-                    selected = None
-            slot = {"number": len(blocks) + 1, "raw_subject": names.get(subject, subject)}
-            blocks.append(lesson_block((slot, selected, pending, False, "uncertain")))
-            if selected:
-                media.append(selected[0])
-        return {"parts": split_day("📚 Homework", blocks or ["No confirmed homework found."]),
-                "callback": None, "media": media}
-    day = await displayed_day(session, chat.id, target)
-    if day:
-        chronology = await schedule_rows(session, source_chat_id, date(2000, 1, 1), target)
-        assignments = day_assignments(day, history, [row for row, _ in chronology])
-        header = f"📅 {target:%d.%m.%Y}, {WEEKDAYS[target.weekday()]}"
-        blocks = [lesson_block(assignment) for assignment in assignments]
-        if day.payload.get("state") == "estimated":
-            past = date.fromisoformat(day.payload["estimate_source_date"])
-            blocks.insert(0, f"⚠️ Estimated schedule. Based on {past:%d.%m.%Y}.\n"
-                          "The schedule for this date is not confirmed yet.")
-            links = ", ".join(source_link(source_chat_id, number) for number in day.payload.get("source_ids", []))
-            blocks.append(f"Estimated schedule source: {links or 'link unavailable'}")
-        else:
-            callback = day_source_callback(day, "d", as_of, assignments)
-        shown = {slot.get("subject_key") for slot in day.payload["slots"]}
-        for subject, selected in latest.items():
-            due = effective(selected[0], "due_date")
-            due = date.fromisoformat(due) if isinstance(due, str) else due
-            if subject not in shown and due == target and due >= today:
-                blocks.append("Homework with an explicit deadline outside the displayed schedule:\n" + format_homework(*selected))
-                media.append(selected[0])
-        media.extend(entry[0] for assignment in assignments for entry, _ in assignment_homework(assignment))
-        return {"parts": split_day(header, blocks), "callback": callback, "media": media}
-    if estimate_ready(target, datetime.now(LOCAL_TIME)):
-        return {"parts": [format_estimate_missing(target)], "callback": None, "media": []}
-    earlier = await schedule_rows(session, source_chat_id, target - timedelta(weeks=2), target - timedelta(weeks=1))
-    text = format_orientation(target, earlier, latest)
-    return {"parts": split_day("📅 Schedule", [text]) if units(text) > MESSAGE_LIMIT else [text],
-            "callback": None, "media": []}
 
 
 async def send_saved_response(message: Message, settings: BotSettings, factory, target: date,
@@ -877,7 +373,7 @@ def create_router(settings: BotSettings, session_factory: async_sessionmaker[Asy
             elif chat and len(parts) == 4 and parts[1] == "h" and parts[2].isdigit():
                 item = await session.get(Homework, int(parts[2]))
                 if item and item.chat_id == chat.id and homework_source_callback(item) == query.data:
-                    refs = source_references(None, [(None, (item, None, None), None, False, None)])
+                    refs = source_references(None, [Assignment(slot=None, chosen=(item, None, None))])
             if refs is None:
                 await query.answer("This response has expired; request the schedule again", show_alert=True)
                 return

@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from app.bot import (BotSettings, HELP_TEXT, SCHEDULE_USAGE, can_read_schedule,
-                     ignore_stale_message, parse_user_date, period, schedule_keyboard, split_day)
+                     ignore_stale_message, parse_user_date, period, schedule_keyboard)
+from app.study_view import split_day
 
 
 def test_access_is_limited_to_owner_and_allowed_destination():
@@ -65,7 +66,7 @@ def test_long_homework_title_and_astral_text_do_not_hang():
     import subprocess
     import sys
     subprocess.run([sys.executable, "-c", r"""
-from app.bot import split_day, units
+from app.study_view import split_day, units
 block = "Homework: " + "📚" * 5000 + "\nDeadline not stated"
 parts = split_day("Homework", [block, "Next lesson\nNo homework found"])
 assert 1 < len(parts) < 10

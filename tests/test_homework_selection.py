@@ -1,7 +1,8 @@
 from datetime import date
 from types import SimpleNamespace
 
-from app.bot import assignment_homework, day_assignments, lesson_block, source_fingerprint, source_references
+from app.homework_selection import Assignment, assignment_homework, day_assignments
+from app.study_view import lesson_block, source_fingerprint, source_references
 
 
 def day(when, *subjects):
@@ -23,7 +24,7 @@ def test_complete_interval_and_repeated_subjects():
     first, newer = task(1, "2030-04-08", "Solve exercise 1"), task(2, "2030-04-10", "Solve exercise 2")
     main, repeat = day_assignments(target, {"algebra": [newer, first]}, days)
     assert list(assignment_homework(main)) == [(newer, "likely"), (first, "likely")]
-    assert repeat[3] and repeat[1] is None
+    assert repeat.repeated and repeat.chosen is None
     assert "teacher deadline unspecified" in lesson_block(main)
     assert {key for _, key in source_references(target, [main])} == {1, 2, 10}
     before = source_fingerprint(target.payload, [main])
@@ -36,11 +37,11 @@ def test_explicit_deadline_wins_and_gaps_remain_uncertain():
     dated = task(1, "2030-04-08", "Solve exercise 1", due=target.schedule_date)
     newer = task(2, "2030-04-10", "Solve exercise 2")
     chosen = day_assignments(target, {"algebra": [newer, dated]}, [target])[0]
-    assert chosen[1] == dated and chosen[4] == "explicit"
+    assert chosen.chosen == dated and chosen.relation == "explicit"
     chosen = day_assignments(target, {"algebra": [newer]}, [target])[0]
-    assert chosen[4] == "uncertain" and "connection" in lesson_block(chosen).lower()
+    assert chosen.relation == "uncertain" and "connection" in lesson_block(chosen).lower()
     newer[0].due_date = date(2030, 4, 12)
-    assert day_assignments(target, {"algebra": [newer]}, [target])[0][1] is None
+    assert day_assignments(target, {"algebra": [newer]}, [target])[0].chosen is None
 
 
 def test_new_unread_homework_does_not_replace_confirmed_content():
@@ -48,7 +49,34 @@ def test_new_unread_homework_does_not_replace_confirmed_content():
     confirmed = task(1, "2030-04-08", "Solve exercise 1")
     unread = task(2, "2030-04-10", "Unread photo", status="needs_review")
     selected = day_assignments(target, {"algebra": [unread, confirmed]}, [target])[0]
-    assert selected[1] == confirmed and selected[2] == unread and selected[4] == "uncertain"
+    assert selected.chosen == confirmed and selected.pending == unread and selected.relation == "uncertain"
     text = lesson_block(selected)
     assert "Solve exercise 1" in text and "awaiting confirmation" in text
     assert "Unread photo" not in text
+
+
+def test_empty_and_unknown_subject_assignments_have_named_defaults():
+    target = day("2030-04-11", None, "algebra", "algebra")
+    unknown, empty, repeated = day_assignments(target, {}, [target])
+    assert all(isinstance(item, Assignment) for item in (unknown, empty, repeated))
+    assert unknown.chosen is None and unknown.pending is None and not unknown.repeated
+    assert repeated.repeated and repeated.extras == []
+    assert list(assignment_homework(empty)) == []
+    assert empty.extras is not repeated.extras
+
+
+def test_source_only_assignment_and_callback_keep_fingerprint():
+    import hashlib
+    import json
+    from app.study_view import homework_source_callback
+
+    entry = task(7, "2030-04-10", "Solve exercise 2")
+    item = entry[0]
+    assignment = Assignment(slot=None, chosen=entry)
+    assert source_references(None, [assignment]) == [("Homework Algebra: instruction", 7)]
+    # Existing saved source buttons must remain valid after the dataclass change.
+    selected = [(item.id, item.subject_key, item.text, item.due_date, item.due_text,
+                 item.status, item.sources, item.attachments, item.owner_override)]
+    raw = json.dumps([{}, selected], sort_keys=True, default=str, ensure_ascii=False)
+    digest = hashlib.sha256(raw.encode()).hexdigest()[:10]
+    assert homework_source_callback(item) == f"src:h:7:{digest}"

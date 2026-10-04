@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from datetime import date, datetime, time, timedelta, timezone
 
 from aiogram import Bot
@@ -10,11 +11,13 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.bot import (PROCESS_INSTANCE, WEEKDAYS, day_assignments, format_estimate_missing, homework_history, lesson_block,
-                     response_view, schedule_keyboard, schedule_rows, source_lines, source_references, units)
+from app.homework_selection import day_assignments, homework_history
+from app.study_view import (WEEKDAYS, format_estimate_missing, lesson_block, response_view,
+                            schedule_keyboard, schedule_rows, source_lines, source_references, units)
 from app.models import BotResponse, ChannelPost, ScheduleDay, SourceChat
 from app.schedule import LOCAL_TIME, displayed_day, estimate_ready, upcoming_monday
 
+PROCESS_INSTANCE = f"{os.getenv('HOSTNAME', 'local')}:{os.getpid()}"
 LIMIT = 4096
 
 

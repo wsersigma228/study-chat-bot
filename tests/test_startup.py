@@ -54,6 +54,8 @@ def test_shared_source_link():
     from app.telegram_sources import source_link
     assert source_link(-1000000000101, 7) == "https://t.me/c/101/7"
     assert source_link(None, 7) == source_link(-303, 7) == "message 7"
+    assert source_link(None, 7, fallback_label="source") == "source 7"
+    assert source_link(-1000000000101, 7, fallback_label="source") == "https://t.me/c/101/7"
 
 
 def test_collector_and_database_imports_do_not_load_schedule_settings(tmp_path):

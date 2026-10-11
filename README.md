@@ -1,39 +1,87 @@
 <div align="center">
 
-# Study Chat Bot
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
+  <img src="docs/readme/hero-light.svg" alt="Study Chat Bot — from chat messages to traceable schedules and homework" width="100%">
+</picture>
 
-**From chat messages to traceable schedules and homework.**
-
-A Python backend with revision-aware storage, conservative English parsing,
-and optional Telegram collection and delivery.
+<br>
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](compose.yaml)
+[![aiogram](https://img.shields.io/badge/Bot-aiogram-26A5E4?logo=telegram&logoColor=white)](app/bot.py)
+[![Telethon](https://img.shields.io/badge/Collector-Telethon-26A5E4?logo=telegram&logoColor=white)](app/collector.py)
 [![Synthetic examples](https://img.shields.io/badge/Examples-synthetic-64748B)](examples/)
 [![Local development](https://img.shields.io/badge/Containers-local%20only-475569?logo=docker&logoColor=white)](OWNER_SETUP.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-181818)](LICENSE)
 
-[Quickstart](#quickstart) | [Architecture](#architecture) | [Validation](#validation) | [Security](SECURITY.md) | [Live setup](OWNER_SETUP.md)
+[Quickstart](#-quickstart) · [Architecture](#-architecture) · [Validation](#-validation) · [Security](SECURITY.md) · [Live setup](OWNER_SETUP.md)
 
 </div>
 
----
+A Python backend that turns study-group chat messages into **revision-aware schedules
+and homework** — with conservative English parsing, explicit review states and optional
+Telegram collection and delivery.
 
+> [!NOTE]
 > **Synthetic examples only.** Every shipped name, ID, message, date and room is invented. No original chat export, private attachment, Telegram session, credential or personal deployment history is included.
 
-## What this project demonstrates
+## ✨ What this project demonstrates
 
-| Backend concern | Implementation |
-| --- | --- |
-| Repeatable ingestion | Telegram Desktop JSON import with stable message identities and revision history |
-| Conservative parsing | Supported English text formats, source references and explicit review states |
-| Missing information | Unavailable attachments and unspecified deadlines remain visible |
-| Human corrections | Owner edits survive automatic reparsing |
-| External delivery | Persistent publication state and reconciliation of uncertain sends |
-| Access boundaries | Read-only collector, restricted bot commands and a separate publication destination |
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 🔁 Repeatable ingestion
+Telegram Desktop JSON import with stable message identities and revision history.
+
+</td>
+<td width="33%" valign="top">
+
+### 🧐 Conservative parsing
+Supported English formats, source references and explicit review states.
+
+</td>
+<td width="33%" valign="top">
+
+### 🕳️ Missing information
+Unavailable attachments and unspecified deadlines stay visible instead of guessed.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### ✍️ Human corrections
+Owner edits survive automatic reparsing.
+
+</td>
+<td valign="top">
+
+### 📬 External delivery
+Persistent publication state and reconciliation of uncertain sends.
+
+</td>
+<td valign="top">
+
+### 🔐 Access boundaries
+Read-only collector, restricted bot commands and a separate publication destination.
+
+</td>
+</tr>
+</table>
 
 The parser uses deterministic rules. LLM, OCR, vision and document text extraction are not implemented. The project handles one source group with one collector; broad natural-language understanding and large-scale operation are outside its current scope.
 
-## Quickstart
+## 👀 In action
+
+<p align="center">
+  <img src="docs/readme/cli-demo.svg" alt="CLI output: idempotent re-import, parsed homework with unspecified deadlines and an unavailable attachment, schedule candidates waiting for review" width="100%">
+</p>
+
+<sub>Real CLI output on the synthetic examples, captured 2026-10-11 (abridged). Re-import changes nothing, missing deadlines stay explicit, and schedules from an unconfirmed publisher wait for review.</sub>
+
+## 🚀 Quickstart
 
 **Requirements:** Docker with Compose. Use a temporary isolated environment locally or on Fedora during verification, with synthetic data and Telegram publication disabled. The Compose project is `study-chat-local`, and services have automatic restarts disabled.
 
@@ -69,6 +117,9 @@ Second import   created=0  changed=0  unchanged=8
 Stored          8 messages · 8 revisions · 1 unavailable document
 ```
 
+<details>
+<summary><b>3–4. Build the projections and stop</b></summary>
+
 ### 3. Build the projections
 
 ```sh
@@ -92,7 +143,9 @@ docker compose ps
 
 Keep any working database, media and session volumes. After verification, remove only disposable resources created for the task after checking their ownership. This public project has no permanent live deployment or autostart service; private `tgdzbot` is the actively used Fedora application.
 
-## Architecture
+</details>
+
+## 🧱 Architecture
 
 ```mermaid
 flowchart LR
@@ -112,7 +165,7 @@ The stored source and the parsed result remain separate. Revisions preserve evid
 
 A send timeout can leave delivery unknown. Publication state records that uncertainty instead of blindly sending a duplicate.
 
-## Validation
+## 🧪 Validation
 
 Run the synthetic checks from the built image:
 
@@ -122,19 +175,24 @@ docker compose run --rm migrate python -m pytest -q
 
 Database integration checks skip unless `TEST_DATABASE_URL` points to a separate, migrated PostgreSQL database whose name ends in `_test`. Never use the application's database for those checks. The command above does not enable database integration by itself.
 
+<details>
+<summary>Recorded verification runs</summary>
+
 **Verified on 2026-10-02:** 39 tests passed with a separate local PostgreSQL database; migrations reached `0009_bot_responses`. The local worker started successfully and all project containers were stopped after verification. This is a recorded check, not a CI badge. [Security findings and remaining risks](SECURITY.md).
 
 **Refactor verified on 2026-10-04:** 61 tests passed after the compliance follow-up in the built image with a separate PostgreSQL test database. See [refactor verification](VALIDATION.md#refactor-verification---2026-10-04) for startup, compatibility and offline worker checks.
 
+</details>
+
 Fixtures and fake Telegram adapters check implementation behavior. They do not prove a real collector event, Telegram conversation or channel delivery. See [VALIDATION.md](VALIDATION.md) for the verification boundaries.
 
-## Optional live setup
+## 📡 Optional live setup
 
 Live credentials are not shipped or configured. [OWNER_SETUP.md](OWNER_SETUP.md) explains private export preparation, exact-byte fingerprints, group binding, publisher evidence and session authorization.
 
 The source group, allowed command groups and publication channel are separate settings. The collector does not post to the source group. Setting a destination channel enables external publication by the worker, so configure it deliberately.
 
-## Explore the code
+## 🗺️ Explore the code
 
 | Start here | Responsibility |
 | --- | --- |
@@ -153,7 +211,7 @@ The source group, allowed command groups and publication channel are separate se
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md), [DOMAIN_RULES.md](DOMAIN_RULES.md) and [DATA_MODEL.md](DATA_MODEL.md) for the implementation boundaries.
 
-## License
+## 📄 License
 
 [MIT License](LICENSE). You may reuse and adapt the published code, including
 commercial use, while retaining its copyright and license notice. This license
